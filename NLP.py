@@ -3,8 +3,8 @@ import pandas as pd
 from itertools import groupby
 from nltk.corpus import stopwords
 
+print "Reading file..."
 reviewFile = pd.read_csv('yelp_academic_dataset_review.csv',usecols = [3,5])
-#reviewFile = pd.read_csv('TestData.csv');
 trainingData = reviewFile[:len(reviewFile)/2]
 testingData = reviewFile[len(reviewFile)/2:]
 
@@ -27,6 +27,7 @@ wordCountInClassification = {}
 for classification in classificationSpace:
 	wordCountInClassification[classification] = []
 
+print "Initial setup, getting vocabulary from training data..."
 for review in trainingReviews:
 	tokens = nltk.word_tokenize(review.decode('utf-8').lower())
 	documentClassification[review] = trainingStars[iterator]
@@ -41,8 +42,10 @@ vocabularySize = len([len(list(group)) for key, group in groupby(vocabulary)])
 
 correctPredictions = 0
 incorrectPredictions = 0
+errorDistance = 0
 i = len(reviewFile)/2
 
+print "Classifying test data..."
 for review in testingReviews:
 	maxProbability = 0
 	classificationOfNewReview = 0
@@ -57,16 +60,15 @@ for review in testingReviews:
 		if classificationProbability > maxProbability:
 			maxProbability = classificationProbability
 			classificationOfNewReview = classification
-#	print "Predicted classification " + str(classificationOfNewReview)
-#	print "actual classification " + str(testingStars[i])
-#	print
-
+	
+	errorDistace = errorDistance + abs(classificationOfNewReview - testingStars[i])
 	if classificationOfNewReview == testingStars[i]:
 		correctPredictions = correctPredictions + 1
 
 	else:
 		incorrectPredictions = incorrectPredictions + 1
 	i = i + 1
-
+errorDistance = float(errorDistance) / (float(len(reviewFile)/2))
 print "Correct Predictions " + str(correctPredictions)
 print "Incorrect predictions "+ str(incorrectPredictions)
+print "Error Distance "+ str(errorDistance)

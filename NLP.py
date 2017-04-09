@@ -41,7 +41,6 @@ vocabulary.sort()
 vocabularySize = len([len(list(group)) for key, group in groupby(vocabulary)])
 
 correctPredictions = 0
-incorrectPredictions = 0
 errorDistance = 0
 i = len(reviewFile)/2
 
@@ -64,11 +63,8 @@ for review in testingReviews:
 	errorDistace = errorDistance + abs(classificationOfNewReview - testingStars[i])
 	if classificationOfNewReview == testingStars[i]:
 		correctPredictions = correctPredictions + 1
-
-	else:
-		incorrectPredictions = incorrectPredictions + 1
 	i = i + 1
 errorDistance = float(errorDistance) / (float(len(reviewFile)/2))
 print "Correct Predictions " + str(correctPredictions)
-print "Incorrect predictions "+ str(incorrectPredictions)
+print "Incorrect predictions "+ str(abs(correctPredictions - float(len(reviewFile)/2)))
 print "Error Distance "+ str(errorDistance)

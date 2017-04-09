@@ -67,4 +67,5 @@ for review in testingReviews:
 errorDistance = float(errorDistance) / (float(len(reviewFile)/2))
 print "Correct Predictions " + str(correctPredictions)
 print "Incorrect predictions "+ str(abs(correctPredictions - float(len(reviewFile)/2)))
+print "Accuracy " + str(float(correctPredictions)/float(len(reviewFile)/2))
 print "Error Distance "+ str(errorDistance)

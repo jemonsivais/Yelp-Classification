@@ -1,71 +1,140 @@
-import nltk
-import pandas as pd
-from itertools import groupby
+import collections, itertools
+import nltk.classify.util, nltk.metrics
+from nltk.classify import NaiveBayesClassifier
 from nltk.corpus import stopwords
+from nltk.collocations import BigramCollocationFinder
+from nltk.metrics import BigramAssocMeasures
+from nltk.probability import FreqDist, ConditionalFreqDist
+import pandas as pd
+from nltk.stem.lancaster import LancasterStemmer
+import timeit
 
-print "Reading file..."
-reviewFile = pd.read_csv('yelp_academic_dataset_review.csv',usecols = [3,5])
-trainingData = reviewFile[:len(reviewFile)/2]
-testingData = reviewFile[len(reviewFile)/2:]
 
-trainingReviews = trainingData.text
-trainingStars = trainingData.stars
+start_time = timeit.default_timer()
 
-testingReviews = testingData.text
-testingStars = testingData.stars
+def best_bigram_word_feats(words, score_fn=BigramAssocMeasures.chi_sq, n=200):
+	bigram_finder = BigramCollocationFinder.from_words(words)
+	bigrams = bigram_finder.nbest(score_fn, n)
+	d = dict([(bigram, True) for bigram in bigrams])
+	d.update(best_word_feats(words))
+	return d
+print 'evaluating best word features'
 
-classificationSpace = [1,2,3,4,5]
-vocabulary = []
+print 'Reading file...'
+reviewFile = pd.read_csv('yelp_academic_dataset_review.csv', nrows = 70000, usecols = [3,5])
+
+reviews = reviewFile.text
+stars = reviewFile.stars
 
 stop = set(stopwords.words('english'))
+stemmer = LancasterStemmer()
 
-iterator = 0
+i = 0
+fivestars = []
+fourstars = []
+threestars = []
+twostars = []
+onestars = []
+for review in reviews:
+	if stars[i] == 5:
+		fivestars.append(review)
+	if stars[i] == 4:
+		fourstars.append(review)
+	if stars[i] == 3:
+		threestars.append(review)
+	if stars[i] == 2:
+		twostars.append(review)
+	if stars[i] == 1:
+		onestars.append(review)
+	i = i + 1 
+ 
+word_fd = FreqDist()
+label_word_fd = ConditionalFreqDist()
 
-documentClassification = {}
-wordCountInClassification = {}
+print 'Getting words...'
+for review in fivestars:
+	if type(review) is str:
+		for word in review.split():
+			if word not in stop:
+				word_fd.update(stemmer.stem(word.decode('utf-8')).lower())
+				label_word_fd['5'].update(stemmer.stem(word.decode('utf-8')).lower())
+ 
+for review in fourstars:
+	if type(review) is str:
+		for word in review.split():
+			word_fd.update(stemmer.stem(word.decode('utf-8')).lower())
+			label_word_fd['4'].update(stemmer.stem(word.decode('utf-8')).lower())
+    
+for review in threestars:
+	if type(review) is str:
+		for word in review.split():
+			word_fd.update(stemmer.stem(word.decode('utf-8')).lower())
+			label_word_fd['3'].update(stemmer.stem(word.decode('utf-8')).lower())
+ 
+for review in twostars:
+	if type(review) is str:
+		for word in review.split():
+			word_fd.update(stemmer.stem(word.decode('utf-8')).lower())
+			label_word_fd['2'].update(stemmer.stem(word.decode('utf-8')).lower())
+			
+for review in onestars:
+	if type(review) is str:
+		for word in review.split():
+			word_fd.update(stemmer.stem(word.decode('utf-8')).lower())
+			label_word_fd['1'].update(stemmer.stem(word.decode('utf-8')).lower())
+ 
+five_word_count = label_word_fd['5'].N()
+four_word_count = label_word_fd['4'].N()
+three_word_count = label_word_fd['3'].N()
+two_word_count = label_word_fd['2'].N()
+one_word_count = label_word_fd['1'].N()
+total_word_count = five_word_count + four_word_count + three_word_count + two_word_count + one_word_count
 
-for classification in classificationSpace:
-	wordCountInClassification[classification] = []
+word_scores = {}
 
-print "Initial setup, getting vocabulary from training data..."
-for review in trainingReviews:
-	tokens = nltk.word_tokenize(review.decode('utf-8').lower())
-	documentClassification[review] = trainingStars[iterator]
-	for token in tokens:
-		if token not in stop and token != '.' :
-			vocabulary.append(token)
-			wordCountInClassification[documentClassification[review]].append(token)
-	iterator = iterator + 1
+for word, freq in word_fd.iteritems():
+    five_score = BigramAssocMeasures.chi_sq(label_word_fd['5'][word],
+        (freq, five_word_count), total_word_count)
+    four_score = BigramAssocMeasures.chi_sq(label_word_fd['4'][word],
+        (freq, four_word_count), total_word_count)
+    three_score = BigramAssocMeasures.chi_sq(label_word_fd['3'][word],
+        (freq, three_word_count), total_word_count)
+    two_score = BigramAssocMeasures.chi_sq(label_word_fd['2'][word],
+        (freq, two_word_count), total_word_count)
+    one_score = BigramAssocMeasures.chi_sq(label_word_fd['1'][word],
+        (freq, one_word_count), total_word_count)
+    word_scores[word] = five_score + four_score + three_score + two_score + one_score
+ 
+best = sorted(word_scores.iteritems(), key=lambda (w,s): s, reverse=True)[:10000]
+bestwords = set([w for w, s in best])
 
-vocabulary.sort()
-vocabularySize = len([len(list(group)) for key, group in groupby(vocabulary)])
+print 'Getting features...'
+fiveStarsFeats = [(best_bigram_word_feats(review.split()), '5') for review in fivestars if type(review) is str]
+fourStarsFeats = [(best_bigram_word_feats(review.split()), '4') for review in fourstars if type(review) is str]
+threeStarsFeats = [(best_bigram_word_feats(review.split()), '3') for review in threestars if type(review) is str]
+twoStarsFeats = [(best_bigram_word_feats(review.split()), '2') for review in twostars if type(review) is str]
+oneStarsFeats = [(best_bigram_word_feats(review.split()), '1') for review in onestars if type(review) is str]
+ 
+fivecutoff = len(fiveStarsFeats)*3/4
+fourcutoff = len(fourStarsFeats)*3/4
+threecutoff = len(threeStarsFeats)*3/4
+twocutoff = len(twoStarsFeats)*3/4
+onecutoff = len(oneStarsFeats)*3/4
 
-correctPredictions = 0
-errorDistance = 0
-i = len(reviewFile)/2
+trainfeats = fiveStarsFeats[:fivecutoff] + fourStarsFeats[:fourcutoff] + threeStarsFeats[:threecutoff] + twoStarsFeats[:twocutoff] + oneStarsFeats[:onecutoff]
+testfeats = fiveStarsFeats[fivecutoff:] + fourStarsFeats[fourcutoff:] + threeStarsFeats[threecutoff:] + twoStarsFeats[twocutoff:] + oneStarsFeats[onecutoff:]
 
-print "Classifying test data..."
-for review in testingReviews:
-	maxProbability = 0
-	classificationOfNewReview = 0
-	for classification in classificationSpace:
-		classificationProbability = 1
-		words = nltk.word_tokenize(review.decode('utf-8').lower())
-		for word in words:
-			if word not in stop and word != '.':
-				probabilityOfCurrentWord = float((wordCountInClassification[classification].count(word) + 1)) / float((len(wordCountInClassification[classification]) + vocabularySize))
-				classificationProbability *= probabilityOfCurrentWord
-				
-		if classificationProbability > maxProbability:
-			maxProbability = classificationProbability
-			classificationOfNewReview = classification
-	
-	errorDistace = errorDistance + abs(classificationOfNewReview - testingStars[i])
-	if classificationOfNewReview == testingStars[i]:
-		correctPredictions = correctPredictions + 1
-	i = i + 1
-errorDistance = float(errorDistance) / (float(len(reviewFile)/2))
-print "Correct Predictions " + str(correctPredictions)
-print "Incorrect predictions "+ str(abs(correctPredictions - float(len(reviewFile)/2)))
-print "Accuracy " + str(float(correctPredictions)/float(len(reviewFile)/2))
-print "Error Distance "+ str(errorDistance)
+print 'Training model...'
+classifier = NaiveBayesClassifier.train(trainfeats)
+refsets = collections.defaultdict(set)
+testsets = collections.defaultdict(set)
+ 
+for i, (feats, label) in enumerate(testfeats):
+		refsets[label].add(i)
+		observed = classifier.classify(feats)
+		testsets[observed].add(i)
+
+print 'accuracy:', nltk.classify.util.accuracy(classifier, testfeats)
+
+classifier.show_most_informative_features()
+print 'Elapsed Time ' + str(timeit.default_timer() - start_time)

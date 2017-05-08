@@ -21,8 +21,9 @@ def best_bigram_word_feats(words, score_fn=BigramAssocMeasures.chi_sq, n=200):
 print 'evaluating best word features'
 
 print 'Reading file...'
-reviewFile = pd.read_csv('yelp_academic_dataset_review.csv', nrows = 70000, usecols = [3,5])
-
+### Uncomment this line and modify number of rows needed to read as you wish.
+#reviewFile = pd.read_csv('yelp_academic_dataset_review.csv', nrows = 70000, usecols = [3,5])
+reviewfile = pd.read_csv('yelp_academic_dataset_review.csv', usecols = [3,5])
 reviews = reviewFile.text
 stars = reviewFile.stars
 
